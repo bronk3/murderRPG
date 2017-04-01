@@ -129,24 +129,40 @@ function processHandler() { return true; }
 //TODO: needs work to display/accept different kinds of conversation
 function converse (sprite1, sprite2) { 
 	var displayTextArray = getConversation(sprite1.customConversation);
-	var bpmText;
   	var rand = Math.floor(Math.random() * displayTextArray.length);
 	var text = displayTextArray[rand];
-	bmpText = game.add.bitmapText(sprite1.body.x , sprite1.body.y - sprite1.body.halfHeight, 'gem', text, 16);
-	bmpText.maxWidth = 400;
 	displayTextArray.splice(rand, 1);
-	game.time.events.add(Phaser.Timer.SECOND * 2, textEffect, this, bmpText);
+	npcTalk(text, sprite1.body.x, sprite1.body.y, sprite1.body.halfHeight);
 }
 
 function getConversation (talkType) {
 	if(talkType == 'dialogue' && conversation.dialogue.length > 0) {
-		return conversation.dialogue;
-	}else if (talkType == 'questionGeneral' && conversation.questionGeneral.length > 0) {
-		return conversation.questionGeneral;
-	}else if (talkType == 'questionOptions' && conversation.questionOptions.length > 0) {
-		return conversation.questionOptions;
+		return dialogue();
+	} else if (talkType == 'questionGeneral' && conversation.questionGeneral.length > 0) {
+		return questionGeneral();
+	} else if (talkType == 'questionOptions' && conversation.questionOptions.length > 0) {
+		return questionOptions();
 	}
 	return [];
+}
+
+function questionGeneral () {
+	return conversation.questionGeneral;
+}
+
+function questionOptions () {
+	return conversation.questionOptions;
+}
+
+function dialogue () {
+	return conversation.dialogue;
+}
+
+function npcTalk (text, x, y, halfHeight) {
+	var bpmText;
+	bmpText = game.add.bitmapText(x, y - halfHeight, 'gem', text, 16);
+	bmpText.maxWidth = 400;
+	game.time.events.add(Phaser.Timer.SECOND * 2, textEffect, this, bmpText);
 }
 
 function textEffect (conversation) {
