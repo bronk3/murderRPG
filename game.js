@@ -1,13 +1,13 @@
 // Initialize Phaser, and creates a 400x490px game
 var game = new Phaser.Game(590, 332, Phaser.AUTO, 'game_div');
 var game_state = {};
-var npcGroup;
+var npcGroups;
 var player;
 var cursors;
 
 //NPC
 var graphicArray;
-var conversation;
+var conversations;
 
 // Creates a new 'main' state that wil contain the game
 game_state.main = function() { };  
@@ -27,7 +27,7 @@ game_state.main.prototype = {
         }); 
         //NPC's dialogue
 
-        conversation = {
+        conversations = {
 	        dialogue: ['howdy ho!', 'yellow',
 	        			 'THERES BEEN A MURDER'],
 	        questionGeneral: ['what is your name?',
@@ -52,19 +52,26 @@ game_state.main.prototype = {
         game.physics.arcade.enable(player);
         player.body.collideWorldBounds = true;
 
-        //NPC group
-	    npcGroup = game.add.physicsGroup();
-
-	    //Setting up NPC's 
-	    for (var i = 0; i < 6; i++) {
-	    	var rnd = game.rnd.integerInRange(0, 11);
-	        var c = npcGroup.create(game.world.randomX,  game.world.randomY, graphicArray[i], rnd);
-	        c.name = graphicArray[i] + i;
-	        c.body.mass = -100;
-	        c.body.onOverlap = new Phaser.Signal();
-	        c.body.onOverlap.addOnce(converse, this);
-	        c.customConversation = anyConversationType();
+        //NPC groups
+	    npcGroups = {
+		    dialogue : game.add.physicsGroup(),
+		    questionGeneral : game.add.physicsGroup(),
+		    questionOptions : game.add.physicsGroup(),
 	    }
+
+Object.keys(conversations).forEach(function(key) {
+    console.log(key, conversations[key]);
+    for (var i = conversations[key].length; i > 0; i--) {
+		var rnd = game.rnd.integerInRange(0, 11);
+        var c = npcGroups[key].create(game.world.randomX,  game.world.randomY, graphicArray[i], rnd);
+        c.name = graphicArray[i] + i;
+        c.body.mass = -100;
+        c.body.onOverlap = new Phaser.Signal();
+        c.body.onOverlap.addOnce(eval(key), this);
+        c.customconversations = key;
+    }
+});
+
 
 	    //Keyboard Input
         cursors = game.input.keyboard.createCursorKeys();
@@ -84,7 +91,9 @@ game_state.main.prototype = {
     
     update: function() {
     	//physics
-      game.physics.arcade.overlap(player, npcGroup, collisionHandler, processHandler, this);
+    	Object.keys(npcGroups).forEach(function(key) {
+      		game.physics.arcade.overlap(player, npcGroups[key], collisionHandler, processHandler, this);
+  		});
     
         if (cursors.up.isDown) {
 	        if(player.body.velocity.y != -200) {
@@ -126,36 +135,39 @@ function collisionHandler(player, npcs) { return true; }
 
 function processHandler() { return true; }
 
-//TODO: needs work to display/accept different kinds of conversation
+//TODO: needs work to display/accept different kinds of conversations
 function converse (sprite1, sprite2) { 
-	var displayTextArray = getConversation(sprite1.customConversation);
+	var displayTextArray = getconversations(sprite1.customconversations);
   	var rand = Math.floor(Math.random() * displayTextArray.length);
 	var text = displayTextArray[rand];
 	displayTextArray.splice(rand, 1);
 	npcTalk(text, sprite1.body.x, sprite1.body.y, sprite1.body.halfHeight);
 }
 
-function getConversation (talkType) {
-	if(talkType == 'dialogue' && conversation.dialogue.length > 0) {
+function getconversations (talkType) {
+	if(talkType == 'dialogue' && conversations.dialogue.length > 0) {
 		return dialogue();
-	} else if (talkType == 'questionGeneral' && conversation.questionGeneral.length > 0) {
+	} else if (talkType == 'questionGeneral' && conversations.questionGeneral.length > 0) {
 		return questionGeneral();
-	} else if (talkType == 'questionOptions' && conversation.questionOptions.length > 0) {
+	} else if (talkType == 'questionOptions' && conversations.questionOptions.length > 0) {
 		return questionOptions();
 	}
 	return [];
 }
 
 function questionGeneral () {
-	return conversation.questionGeneral;
+	console.log('question General');
+	return conversations.questionGeneral;
 }
 
 function questionOptions () {
-	return conversation.questionOptions;
+	console.log('question Options');
+	return conversations.questionOptions;
 }
 
 function dialogue () {
-	return conversation.dialogue;
+	console.log('dialog');
+	return conversations.dialogue;
 }
 
 function npcTalk (text, x, y, halfHeight) {
@@ -165,18 +177,18 @@ function npcTalk (text, x, y, halfHeight) {
 	game.time.events.add(Phaser.Timer.SECOND * 2, textEffect, this, bmpText);
 }
 
-function textEffect (conversation) {
-	var tweenFadeOut = game.add.tween(conversation).to( { alpha: 0 }, 2000, Phaser.Easing.Bounce.Out, true).loop(true);
-	 game.time.events.add(Phaser.Timer.SECOND * 4, garbageText, this, conversation);
+function textEffect (conversations) {
+	var tweenFadeOut = game.add.tween(conversations).to( { alpha: 0 }, 2000, Phaser.Easing.Bounce.Out, true).loop(true);
+	 game.time.events.add(Phaser.Timer.SECOND * 4, garbageText, this, conversations);
 }
 
-function garbageText (conversation) {
-	conversation.text = "";
-	conversation.purgeGlyphs();
+function garbageText (conversations) {
+	conversations.text = "";
+	conversations.purgeGlyphs();
 }
 
-function anyConversationType () {
-	var keys = Object.keys(conversation);
+function anyconversationsType () {
+	var keys = Object.keys(conversations);
     return keys[Math.floor(Math.random() * keys.length)];
 }
 
