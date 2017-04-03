@@ -4,6 +4,17 @@ var game_state = {};
 var npcGroup;
 var player;
 var cursors;
+var keyboard;
+var characterStatus = 100;
+var inConversation = false;
+
+var score = 0;
+
+
+//Talking
+var conversationText;
+var responseText;
+var currentNPC;
 
 //NPC
 var graphicArray;
@@ -27,20 +38,20 @@ game_state.main.prototype = {
         }); 
         //NPC's dialogue
 
-        conversation = {
-	        dialogue: ['howdy ho!', 'yellow',
-	        			 'THERES BEEN A MURDER'],
-	        questionGeneral: ['what is your name?',
-				         'Why are you here?',
-				         'would you like to go on an adventure?'],
-	        questionOptions: [{
-	        	question: 'I have valueable information about this case, do you want to hear more?',
-	        	options: ['Yes', 'No'],
-	        	}, {
-	         	question: 'I\'d like for us to make this work in both our favors, dont you?',
-	         	options: ['Yes', 'No'],
-	         },],
-    	};
+
+        conversations = [
+        {
+        	question: 'Would you like some more coffee',
+        	options: {'100': 'yes', '-10': 'no'}
+        },
+        {
+        	question: 'Can I go now',
+        	options: {'-200': 'yes', '5': 'no'}
+        },
+        {
+        	question: 'theres been a murder',
+        },
+        ];
 	},
 
     create: function() { 
@@ -56,18 +67,23 @@ game_state.main.prototype = {
 	    npcGroup = game.add.physicsGroup();
 
 	    //Setting up NPC's 
-	    for (var i = 0; i < 6; i++) {
+	    for (var i = 0; i <= conversations.length; i++) {
 	    	var rnd = game.rnd.integerInRange(0, 11);
 	        var c = npcGroup.create(game.world.randomX,  game.world.randomY, graphicArray[i], rnd);
 	        c.name = graphicArray[i] + i;
 	        c.body.mass = -100;
 	        c.body.onOverlap = new Phaser.Signal();
 	        c.body.onOverlap.addOnce(converse, this);
-	        c.customConversation = anyConversationType();
+	        c.conversation = assignConversation();
 	    }
+
+
 
 	    //Keyboard Input
         cursors = game.input.keyboard.createCursorKeys();
+		keyboard = game.input.keyboard;
+		keyboard.addCallbacks(this, null, null, reply);
+		keyboard.addKey(13).processKeyDown = checkResponse;
 
         //Screen Text
         var bpmText;
@@ -86,6 +102,13 @@ game_state.main.prototype = {
     	//physics
       game.physics.arcade.overlap(player, npcGroup, collisionHandler, processHandler, this);
     
+      	if(inConversation) {	    	
+      		player.animations.stop();
+	    	player.body.velocity.x = 0;
+	    	player.body.velocity.y = 0;
+	    	return;
+	    } 
+
         if (cursors.up.isDown) {
 	        if(player.body.velocity.y != -200) {
 		         player.body.velocity.y = -200;
@@ -126,42 +149,71 @@ function collisionHandler(player, npcs) { return true; }
 
 function processHandler() { return true; }
 
+function reply(char) {
+	if(inConversation) {
+		responseText.text = responseText.text + char;
+	}
+}
+
+function checkResponse (event) {
+	var options = currentNPC.conversation.options;
+	if(inConversation && options) {
+		Object.keys(options).forEach(function(key) {
+			if(responseText.text == options[key]) {
+				advancePlot(key);
+				textByeBye();
+			}
+		});
+	}
+}
+
+
+function advancePlot(points) {
+	score = score + parseInt(points);
+}
+
 //TODO: needs work to display/accept different kinds of conversation
 function converse (sprite1, sprite2) { 
-	var displayTextArray = getConversation(sprite1.customConversation);
-	var bpmText;
-  	var rand = Math.floor(Math.random() * displayTextArray.length);
-	var text = displayTextArray[rand];
-	bmpText = game.add.bitmapText(sprite1.body.x , sprite1.body.y - sprite1.body.halfHeight, 'gem', text, 16);
-	bmpText.maxWidth = 400;
-	displayTextArray.splice(rand, 1);
-	game.time.events.add(Phaser.Timer.SECOND * 2, textEffect, this, bmpText);
+	inConversation = true;
+	currentNPC = sprite1;
+	conversationText = game.add.bitmapText(
+		sprite1.body.x ,
+		sprite1.body.y - sprite1.body.halfHeight,
+	 	'gem',
+	  	conversationSnipet(sprite1.conversation),
+	  	16);
+	conversationText.maxWidth = 400;
+	responseText = game.add.text(sprite2.body.x , sprite2.body.y + sprite2.body.halfHeight, "", { fontSize: '14px', fill: '#fff' });
+	if (!sprite1.conversation.options) game.time.events.add(Phaser.Timer.SECOND * 2, textByeBye, this); 
 }
 
-function getConversation (talkType) {
-	if(talkType == 'dialogue' && conversation.dialogue.length > 0) {
-		return conversation.dialogue;
-	}else if (talkType == 'questionGeneral' && conversation.questionGeneral.length > 0) {
-		return conversation.questionGeneral;
-	}else if (talkType == 'questionOptions' && conversation.questionOptions.length > 0) {
-		return conversation.questionOptions;
+
+function textByeBye () {
+	var tweenFadeOut = game.add.tween(conversationText)
+	.to( { alpha: 0 }, 500, Phaser.Easing.Bounce.Out, true);
+	tweenFadeOut.onComplete = garbageConversation;
+}
+
+function garbageConversation (one, two) {
+	conversationText.text = "";
+	conversationText.purgeGlyphs();
+	responseText.destroy();
+	inConversation = false;
+}
+
+function conversationSnipet(snipet) {
+	var options = '';
+	if(snipet && snipet['options']) {
+		options = Object.values(snipet.options).join(' /');
 	}
-	return [];
+	return snipet.question + '\n' + options;
 }
 
-function textEffect (conversation) {
-	var tweenFadeOut = game.add.tween(conversation).to( { alpha: 0 }, 2000, Phaser.Easing.Bounce.Out, true).loop(true);
-	 game.time.events.add(Phaser.Timer.SECOND * 4, garbageText, this, conversation);
-}
-
-function garbageText (conversation) {
-	conversation.text = "";
-	conversation.purgeGlyphs();
-}
-
-function anyConversationType () {
-	var keys = Object.keys(conversation);
-    return keys[Math.floor(Math.random() * keys.length)];
+function assignConversation() {  	
+	var rand = Math.floor(Math.random() * conversations.length);
+	var conversationSnipet = conversations[rand];
+	conversations.splice(rand, 1);
+	return conversationSnipet;
 }
 
 // Add and start the 'main' state to start the game
